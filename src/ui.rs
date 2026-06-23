@@ -1,11 +1,10 @@
 use std::sync::mpsc::{self, Receiver};
 
-use eframe::egui::{self, ColorImage, TextEdit, TextureHandle};
+use eframe::egui::{self, TextEdit};
 use tokio::runtime::Runtime;
 
 use crate::{
     api::BoomlingsApi,
-    icon_renderer,
     models::{CreatedLevel, SearchEntry, SearchType},
     storage,
 };
@@ -13,8 +12,6 @@ use crate::{
 struct SearchOutput {
     results: String,
     created_levels: Vec<CreatedLevel>,
-    icon_image: Option<ColorImage>,
-    icon_error: Option<String>,
 }
 
 pub struct GdInfoApp {
@@ -23,8 +20,6 @@ pub struct GdInfoApp {
     results: String,
     history: Vec<SearchEntry>,
     created_levels: Vec<CreatedLevel>,
-    player_icon: Option<TextureHandle>,
-    player_icon_error: Option<String>,
     comment_page: u32,
     runtime: Option<Runtime>,
     api: Option<BoomlingsApi>,
@@ -56,8 +51,6 @@ impl GdInfoApp {
             results,
             history: storage::load_history(),
             created_levels: Vec::new(),
-            player_icon: None,
-            player_icon_error: None,
             comment_page: 0,
             runtime,
             api,
@@ -94,8 +87,6 @@ impl GdInfoApp {
         self.pending = Some(receiver);
         self.searching = true;
         self.created_levels.clear();
-        self.player_icon = None;
-        self.player_icon_error = None;
         self.results = "Searching...".to_owned();
         storage::remember_search(
             &mut self.history,
@@ -108,35 +99,23 @@ impl GdInfoApp {
         runtime.spawn(async move {
             let output = match search_type {
                 SearchType::Player => match api.search_player(&query).await {
-                    Ok(profile) => {
-                        let icon_result =
-                            icon_renderer::load_icon_image(&profile.player.icon).await;
-                        SearchOutput {
-                            results: profile.to_result_text(),
-                            created_levels: profile.created_levels,
-                            icon_image: icon_result.as_ref().ok().cloned(),
-                            icon_error: icon_result.err().map(|error| error.to_string()),
-                        }
-                    }
+                    Ok(profile) => SearchOutput {
+                        results: profile.to_result_text(),
+                        created_levels: profile.created_levels,
+                    },
                     Err(error) => SearchOutput {
                         results: format!("Error: {error}"),
                         created_levels: Vec::new(),
-                        icon_image: None,
-                        icon_error: None,
                     },
                 },
                 SearchType::Level => match api.search_level(&query, comment_page).await {
                     Ok(level) => SearchOutput {
                         results: level.to_result_text(),
                         created_levels: Vec::new(),
-                        icon_image: None,
-                        icon_error: None,
                     },
                     Err(error) => SearchOutput {
                         results: format!("Error: {error}"),
                         created_levels: Vec::new(),
-                        icon_image: None,
-                        icon_error: None,
                     },
                 },
             };
@@ -146,40 +125,21 @@ impl GdInfoApp {
         });
     }
 
-    fn receive_pending(&mut self, ctx: &egui::Context) {
+    fn receive_pending(&mut self) {
         if let Some(receiver) = &self.pending {
             if let Ok(output) = receiver.try_recv() {
                 self.results = output.results;
                 self.created_levels = output.created_levels;
-                self.player_icon = output
-                    .icon_image
-                    .map(|image| icon_renderer::texture_from_image(ctx, image));
-                self.player_icon_error = output.icon_error;
                 self.searching = false;
                 self.pending = None;
             }
         }
     }
-
-    fn show_player_icon(&self, ui: &mut egui::Ui) {
-        if self.player_icon.is_none() && self.player_icon_error.is_none() {
-            return;
-        }
-
-        ui.vertical(|ui| {
-            ui.label("Player Icon:");
-            if let Some(texture) = &self.player_icon {
-                ui.image((texture.id(), egui::vec2(72.0, 72.0)));
-            } else {
-                ui.label("Icon unavailable");
-            }
-        });
-    }
 }
 
 impl eframe::App for GdInfoApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.receive_pending(ctx);
+        self.receive_pending();
 
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
@@ -255,14 +215,8 @@ impl eframe::App for GdInfoApp {
 
                             if ui.button("Clear Results").clicked() {
                                 self.results.clear();
-                                self.player_icon = None;
-                                self.player_icon_error = None;
                             }
                         });
-                    });
-
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                        self.show_player_icon(ui);
                     });
                 });
 

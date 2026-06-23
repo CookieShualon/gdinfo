@@ -227,12 +227,6 @@ fn player_from_values(values: &HashMap<String, String>) -> PlayerInfo {
         creator_points: value(values, "8"),
         global_rank: value_or(values, "30", "6"),
         mod_status: mod_status_name(&value(values, "49")).to_owned(),
-        icon: crate::models::PlayerIcon {
-            cube_id: value_or(values, "21", "9"),
-            primary_color: value(values, "10"),
-            secondary_color: value(values, "11"),
-            glow_enabled: value(values, "28") == "1" || value(values, "15") == "2",
-        },
     }
 }
 

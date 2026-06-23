@@ -1,5 +1,4 @@
 mod api;
-mod icon_renderer;
 mod models;
 mod storage;
 mod ui;

@@ -25,7 +25,6 @@ Important source files:
 - `src/api.rs` owns Boomlings API requests and parsing.
 - `src/models.rs` owns app data structs.
 - `src/storage.rs` owns local search history storage.
-- `src/icon_renderer.rs` owns icon image fetching, caching, decoding, and egui texture conversion.
 
 ## API Rules
 
@@ -40,20 +39,7 @@ Use the Boomlings API for all Geometry Dash data:
 - Colors
 - Icon IDs
 
-Only use GDBrowser IconKit for rendered icon image assets.
-
 Do not use GDBrowser as a replacement for Boomlings data endpoints. GDBrowser is slower and not intended to replace direct Boomlings API access.
-
-## Icon Rendering
-
-Player icon data comes from Boomlings user objects:
-
-- Cube ID
-- Primary color
-- Secondary color
-- Glow enabled
-
-`src/icon_renderer.rs` may call GDBrowser IconKit only to fetch icon image assets. It must cache generated icons under `cache/icons/` and must not fail player profile loading if icon rendering fails.
 
 ## Verification
 
@@ -97,4 +83,3 @@ Use `gh run list` and `gh run view <run-id>` to inspect workflow runs.
 Generated files that should stay untracked:
 
 - `target/`
-- `cache/`

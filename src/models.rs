@@ -41,7 +41,6 @@ pub struct PlayerInfo {
     pub creator_points: String,
     pub global_rank: String,
     pub mod_status: String,
-    pub icon: PlayerIcon,
 }
 
 impl PlayerInfo {
@@ -62,14 +61,6 @@ impl PlayerInfo {
             display(&self.mod_status),
         )
     }
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct PlayerIcon {
-    pub cube_id: String,
-    pub primary_color: String,
-    pub secondary_color: String,
-    pub glow_enabled: bool,
 }
 
 #[derive(Clone, Debug, Default)]
