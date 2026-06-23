@@ -35,6 +35,19 @@ cargo run
 cargo build --release
 ```
 
+## Rate Limits
+
+Sending too many Geometry Dash API requests in a short time can rate limit the app and temporarily block additional requests.
+
+Exact limits change over time, but as of November 3, 2023, the rough limits were:
+
+- `downloadGJLevel`: about 20 requests per minute
+- Other data-retrieval endpoints: about 2 requests per second
+
+GD Info does not currently call `downloadGJLevel`; it only uses data-retrieval endpoints for players, levels, created levels, and comments.
+
+Longer-term limits can also apply on top of the short-term limits.
+
 ## Verify
 
 ```bash
