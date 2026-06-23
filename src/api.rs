@@ -226,6 +226,7 @@ fn player_from_values(values: &HashMap<String, String>) -> PlayerInfo {
         demons: value(values, "4"),
         creator_points: value(values, "8"),
         global_rank: value_or(values, "30", "6"),
+        mod_status: mod_status_name(&value(values, "49")).to_owned(),
         icon: crate::models::PlayerIcon {
             cube_id: value_or(values, "21", "9"),
             primary_color: value(values, "10"),
@@ -267,6 +268,7 @@ fn parse_level_response(response: &str) -> Option<LevelInfo> {
         id: value(&level_values, "1"),
         creator,
         difficulty: difficulty_name(&level_values),
+        rate_status: rate_status_name(&level_values),
         downloads: value(&level_values, "10"),
         likes: value(&level_values, "14"),
         length: length_name(&value(&level_values, "15")).to_owned(),
@@ -408,6 +410,45 @@ fn difficulty_name(values: &HashMap<String, String>) -> String {
         _ => "N/A",
     }
     .to_owned()
+}
+
+fn mod_status_name(mod_status: &str) -> &str {
+    match mod_status {
+        "1" => "Moderator",
+        "2" => "Elder Moderator",
+        "3" => "Leaderboard Moderator",
+        _ => "None",
+    }
+}
+
+fn rate_status_name(values: &HashMap<String, String>) -> String {
+    let stars = value(values, "18");
+    let feature_score = value(values, "19");
+    let epic = value(values, "42");
+    let star_text = if stars.trim().is_empty() || stars == "0" {
+        "Unrated".to_owned()
+    } else {
+        format!("Rated {stars} stars")
+    };
+
+    let feature_text = if feature_score.trim().is_empty() || feature_score == "0" {
+        None
+    } else {
+        Some("Featured".to_owned())
+    };
+
+    let epic_text = match epic.as_str() {
+        "1" => Some("Epic".to_owned()),
+        "2" => Some("Legendary".to_owned()),
+        "3" => Some("Mythic".to_owned()),
+        _ => None,
+    };
+
+    [Some(star_text), feature_text, epic_text]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn length_name(length: &str) -> &str {

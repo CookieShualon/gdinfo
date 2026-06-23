@@ -40,13 +40,14 @@ pub struct PlayerInfo {
     pub demons: String,
     pub creator_points: String,
     pub global_rank: String,
+    pub mod_status: String,
     pub icon: PlayerIcon,
 }
 
 impl PlayerInfo {
     pub fn to_result_text(&self) -> String {
         format!(
-            "Username: {}\nAccount ID: {}\nUser ID: {}\nStars: {}\nDiamonds: {}\nSecret Coins: {}\nUser Coins: {}\nMoons: {}\nDemons: {}\nCreator Points: {}\nGlobal Rank: {}",
+            "Username: {}\nAccount ID: {}\nUser ID: {}\nStars: {}\nDiamonds: {}\nSecret Coins: {}\nUser Coins: {}\nMoons: {}\nDemons: {}\nCreator Points: {}\nGlobal Rank: {}\nMod Status: {}",
             display(&self.username),
             display(&self.account_id),
             display(&self.user_id),
@@ -58,6 +59,7 @@ impl PlayerInfo {
             display(&self.demons),
             display(&self.creator_points),
             display(&self.global_rank),
+            display(&self.mod_status),
         )
     }
 }
@@ -115,6 +117,7 @@ pub struct LevelInfo {
     pub id: String,
     pub creator: String,
     pub difficulty: String,
+    pub rate_status: String,
     pub downloads: String,
     pub likes: String,
     pub length: String,
@@ -127,11 +130,12 @@ pub struct LevelInfo {
 impl LevelInfo {
     pub fn to_result_text(&self) -> String {
         let mut text = format!(
-            "Level Name: {}\nLevel ID: {}\nCreator: {}\nDifficulty: {}\nDownloads: {}\nLikes: {}\nLength: {}\nSong Name: {}",
+            "Level Name: {}\nLevel ID: {}\nCreator: {}\nDifficulty: {}\nRate Status: {}\nDownloads: {}\nLikes: {}\nLength: {}\nSong Name: {}",
             display(&self.name),
             display(&self.id),
             display(&self.creator),
             display(&self.difficulty),
+            display(&self.rate_status),
             display(&self.downloads),
             display(&self.likes),
             display(&self.length),
