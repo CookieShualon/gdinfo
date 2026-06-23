@@ -10,8 +10,9 @@ use crate::{
 };
 
 struct SearchOutput {
-    results: String,
-    created_levels: Vec<CreatedLevel>,
+    results: Option<String>,
+    created_levels: Option<Vec<CreatedLevel>>,
+    show_created_levels: bool,
 }
 
 pub struct GdInfoApp {
@@ -20,7 +21,9 @@ pub struct GdInfoApp {
     results: String,
     history: Vec<SearchEntry>,
     created_levels: Vec<CreatedLevel>,
+    show_created_levels: bool,
     comment_page: u32,
+    created_levels_page: u32,
     runtime: Option<Runtime>,
     api: Option<BoomlingsApi>,
     pending: Option<Receiver<SearchOutput>>,
@@ -51,7 +54,9 @@ impl GdInfoApp {
             results,
             history: storage::load_history(),
             created_levels: Vec::new(),
+            show_created_levels: false,
             comment_page: 0,
+            created_levels_page: 0,
             runtime,
             api,
             pending: None,
@@ -60,6 +65,14 @@ impl GdInfoApp {
     }
 
     fn start_search(&mut self, ctx: &egui::Context) {
+        self.start_search_with_options(ctx, false);
+    }
+
+    fn start_created_levels_page_search(&mut self, ctx: &egui::Context) {
+        self.start_search_with_options(ctx, true);
+    }
+
+    fn start_search_with_options(&mut self, ctx: &egui::Context, keep_created_levels: bool) {
         let query = self.query.trim().to_owned();
         if query.is_empty() {
             self.results = "Enter a search term.".to_owned();
@@ -82,12 +95,21 @@ impl GdInfoApp {
         } else {
             0
         };
+        let created_levels_page = if search_type == SearchType::Player {
+            self.created_levels_page
+        } else {
+            0
+        };
+        let update_results = !keep_created_levels;
         let repaint_ctx = ctx.clone();
 
         self.pending = Some(receiver);
         self.searching = true;
-        self.created_levels.clear();
-        self.results = "Searching...".to_owned();
+        if !keep_created_levels {
+            self.created_levels.clear();
+            self.show_created_levels = false;
+            self.results = "Searching...".to_owned();
+        }
         storage::remember_search(
             &mut self.history,
             SearchEntry {
@@ -98,24 +120,28 @@ impl GdInfoApp {
 
         runtime.spawn(async move {
             let output = match search_type {
-                SearchType::Player => match api.search_player(&query).await {
+                SearchType::Player => match api.search_player(&query, created_levels_page).await {
                     Ok(profile) => SearchOutput {
-                        results: profile.to_result_text(),
-                        created_levels: profile.created_levels,
+                        results: update_results.then(|| profile.to_result_text()),
+                        created_levels: Some(profile.created_levels),
+                        show_created_levels: true,
                     },
                     Err(error) => SearchOutput {
-                        results: format!("Error: {error}"),
-                        created_levels: Vec::new(),
+                        results: Some(format!("Error: {error}")),
+                        created_levels: (!keep_created_levels).then(Vec::new),
+                        show_created_levels: keep_created_levels,
                     },
                 },
                 SearchType::Level => match api.search_level(&query, comment_page).await {
                     Ok(level) => SearchOutput {
-                        results: level.to_result_text(),
-                        created_levels: Vec::new(),
+                        results: Some(level.to_result_text()),
+                        created_levels: Some(Vec::new()),
+                        show_created_levels: false,
                     },
                     Err(error) => SearchOutput {
-                        results: format!("Error: {error}"),
-                        created_levels: Vec::new(),
+                        results: Some(format!("Error: {error}")),
+                        created_levels: Some(Vec::new()),
+                        show_created_levels: false,
                     },
                 },
             };
@@ -128,8 +154,13 @@ impl GdInfoApp {
     fn receive_pending(&mut self) {
         if let Some(receiver) = &self.pending {
             if let Ok(output) = receiver.try_recv() {
-                self.results = output.results;
-                self.created_levels = output.created_levels;
+                if let Some(results) = output.results {
+                    self.results = results;
+                }
+                if let Some(created_levels) = output.created_levels {
+                    self.created_levels = created_levels;
+                }
+                self.show_created_levels = output.show_created_levels;
                 self.searching = false;
                 self.pending = None;
             }
@@ -228,6 +259,7 @@ impl eframe::App for GdInfoApp {
                                 self.query = entry.query;
                                 self.search_type = entry.search_type;
                                 self.comment_page = 0;
+                                self.created_levels_page = 0;
                             }
                         }
                     });
@@ -235,10 +267,10 @@ impl eframe::App for GdInfoApp {
 
                 ui.separator();
                 ui.label("Results:");
-                let result_height = if self.created_levels.is_empty() {
-                    320.0
-                } else {
+                let result_height = if self.show_created_levels {
                     220.0
+                } else {
+                    320.0
                 };
                 ui.add_sized(
                     [ui.available_width(), result_height],
@@ -248,23 +280,76 @@ impl eframe::App for GdInfoApp {
                         .lock_focus(true),
                 );
 
-                if !self.created_levels.is_empty() {
+                if self.show_created_levels {
                     ui.separator();
-                    ui.label("Created Levels:");
+                    ui.label(format!(
+                        "Created Levels (page {}):",
+                        self.created_levels_page
+                    ));
 
-                    for level in self.created_levels.clone() {
-                        let label = format!(
-                            "{} | ID {} | Downloads {} | Likes {} | {}",
-                            level.name, level.id, level.downloads, level.likes, level.difficulty
+                    ui.horizontal(|ui| {
+                        if ui
+                            .add_enabled(
+                                !self.searching && self.created_levels_page > 0,
+                                egui::Button::new("Prev"),
+                            )
+                            .clicked()
+                        {
+                            self.created_levels_page -= 1;
+                            self.start_created_levels_page_search(ctx);
+                        }
+
+                        ui.add(
+                            egui::DragValue::new(&mut self.created_levels_page)
+                                .speed(1)
+                                .range(0..=999),
                         );
 
-                        if ui.button(label).clicked() {
-                            self.query = level.id;
-                            self.search_type = SearchType::Level;
-                            self.comment_page = 0;
-                            self.start_search(ctx);
+                        if ui
+                            .add_enabled(!self.searching, egui::Button::new("Load Page"))
+                            .clicked()
+                        {
+                            self.start_created_levels_page_search(ctx);
                         }
-                    }
+
+                        if ui
+                            .add_enabled(!self.searching, egui::Button::new("Next"))
+                            .clicked()
+                        {
+                            self.created_levels_page += 1;
+                            self.start_created_levels_page_search(ctx);
+                        }
+                    });
+
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(ui.available_width(), 260.0),
+                        egui::Layout::top_down(egui::Align::Min),
+                        |ui| {
+                            egui::ScrollArea::vertical().show(ui, |ui| {
+                                if self.created_levels.is_empty() {
+                                    ui.label("No created levels found on this page.");
+                                }
+
+                                for level in self.created_levels.clone() {
+                                    let label = format!(
+                                        "{} | ID {} | Downloads {} | Likes {} | {}",
+                                        level.name,
+                                        level.id,
+                                        level.downloads,
+                                        level.likes,
+                                        level.difficulty
+                                    );
+
+                                    if ui.button(label).clicked() {
+                                        self.query = level.id;
+                                        self.search_type = SearchType::Level;
+                                        self.comment_page = 0;
+                                        self.start_search(ctx);
+                                    }
+                                }
+                            });
+                        },
+                    );
                 }
             });
         });

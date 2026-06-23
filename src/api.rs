@@ -24,7 +24,11 @@ impl BoomlingsApi {
         Ok(Self { client })
     }
 
-    pub async fn search_player(&self, username: &str) -> Result<PlayerProfile, ApiError> {
+    pub async fn search_player(
+        &self,
+        username: &str,
+        created_levels_page: u32,
+    ) -> Result<PlayerProfile, ApiError> {
         let username = username.trim();
         if username.is_empty() {
             return Err(ApiError::Input("Enter a username.".to_owned()));
@@ -44,7 +48,9 @@ impl BoomlingsApi {
 
         if account_id.is_empty() {
             let player = player_from_values(&search_values);
-            let created_levels = self.created_levels(&player.user_id).await?;
+            let created_levels = self
+                .created_levels(&player.user_id, created_levels_page)
+                .await?;
             return Ok(PlayerProfile {
                 player,
                 created_levels,
@@ -60,7 +66,9 @@ impl BoomlingsApi {
 
         if details == "-1" || details.trim().is_empty() {
             let player = player_from_values(&search_values);
-            let created_levels = self.created_levels(&player.user_id).await?;
+            let created_levels = self
+                .created_levels(&player.user_id, created_levels_page)
+                .await?;
             return Ok(PlayerProfile {
                 player,
                 created_levels,
@@ -68,7 +76,9 @@ impl BoomlingsApi {
         }
 
         let player = player_from_values(&parse_pairs(&details));
-        let created_levels = self.created_levels(&player.user_id).await?;
+        let created_levels = self
+            .created_levels(&player.user_id, created_levels_page)
+            .await?;
 
         Ok(PlayerProfile {
             player,
@@ -118,15 +128,26 @@ impl BoomlingsApi {
         Ok(level)
     }
 
-    async fn created_levels(&self, user_id: &str) -> Result<Vec<CreatedLevel>, ApiError> {
+    async fn created_levels(
+        &self,
+        user_id: &str,
+        created_levels_page: u32,
+    ) -> Result<Vec<CreatedLevel>, ApiError> {
         if user_id.trim().is_empty() {
             return Ok(Vec::new());
         }
 
+        let page = created_levels_page.to_string();
         let response = self
             .post(
                 "getGJLevels21.php",
-                &[("str", user_id), ("type", "5"), ("secret", SECRET)],
+                &[
+                    ("str", user_id),
+                    ("type", "5"),
+                    ("page", &page),
+                    ("count", "10"),
+                    ("secret", SECRET),
+                ],
             )
             .await?;
 
