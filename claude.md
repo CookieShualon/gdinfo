@@ -1,27 +1,38 @@
 # Claude Notes
 
-GD Info is a small native Rust desktop utility using egui/eframe.
+GD Info is a small native Rust desktop inspector using egui/eframe.
 
 ## Hard Rules
 
 - Keep Boomlings as the only source for Geometry Dash data.
 - Do not replace player, level, comment, or created-level requests with GDBrowser requests.
-- Keep the UI compact and utility-like.
+- Keep the UI compact, structured, and utility-like.
+- Do not regress the primary results UI to terminal-style text blobs.
+- Keep comment page controls inside the Comments section; changing comment pages should refresh only comments, not the whole level result.
 - Avoid adding dependencies unless clearly needed.
+
+## Current Product Surface
+
+- Player lookup includes stats, IDs, icon IDs, colors, privacy, and social fields.
+- Level lookup includes rate data, coins, object count, version, copy state, original ID, two-player state, and song metadata.
+- Player profiles include created levels with paging, filtering, sorting, open, and copy-ID actions.
+- Level views include comments with isolated comment pagination.
+- App-local features include favorites, recent searches, settings, and in-memory lookup cache.
+- Cross-navigation links created levels to levels, level creators to players, original IDs to levels, and commenters to players.
 
 ## Current Modules
 
 - `src/api.rs`: Boomlings API calls and response parsing.
 - `src/ui.rs`: Single-window egui interface.
 - `src/models.rs`: Shared structs.
-- `src/storage.rs`: Last-search history.
+- `src/storage.rs`: Local app data persistence for history, favorites, and settings.
 
 ## Test Command
 
 Run this after edits:
 
 ```bash
-cargo fmt && cargo check
+cargo fmt && cargo test && cargo check
 ```
 
 ## Releases

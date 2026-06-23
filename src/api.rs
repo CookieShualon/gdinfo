@@ -14,9 +14,9 @@ pub struct BoomlingsApi {
 }
 
 impl BoomlingsApi {
-    pub fn new() -> Result<Self, ApiError> {
+    pub fn with_timeout_secs(timeout_secs: u64) -> Result<Self, ApiError> {
         let client = Client::builder()
-            .timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(timeout_secs.max(1)))
             .user_agent("")
             .build()
             .map_err(ApiError::Http)?;
@@ -158,7 +158,7 @@ impl BoomlingsApi {
         Ok(parse_created_levels_response(&response))
     }
 
-    async fn level_comments(
+    pub async fn level_comments(
         &self,
         level_id: &str,
         comment_page: u32,
@@ -248,6 +248,23 @@ fn player_from_values(values: &HashMap<String, String>) -> PlayerInfo {
         creator_points: value(values, "8"),
         global_rank: value_or(values, "30", "6"),
         mod_status: mod_status_name(&value(values, "49")).to_owned(),
+        cube_icon: value(values, "21"),
+        ship_icon: value(values, "22"),
+        ball_icon: value(values, "23"),
+        ufo_icon: value(values, "24"),
+        wave_icon: value(values, "25"),
+        robot_icon: value(values, "26"),
+        spider_icon: value(values, "43"),
+        swing_icon: value(values, "53"),
+        primary_color: value(values, "10"),
+        secondary_color: value(values, "11"),
+        glow: enabled_name(&value(values, "28")).to_owned(),
+        message_privacy: message_privacy_name(&value(values, "18")).to_owned(),
+        friend_privacy: friend_privacy_name(&value(values, "19")).to_owned(),
+        comment_history_privacy: comment_history_privacy_name(&value(values, "50")).to_owned(),
+        youtube: value(values, "20"),
+        twitter: value(values, "44"),
+        twitch: value(values, "45"),
     }
 }
 
@@ -271,23 +288,45 @@ fn parse_level_response(response: &str) -> Option<LevelInfo> {
 
     let custom_song_id = value(&level_values, "35");
     let official_song_id = value(&level_values, "12");
-    let song_name = if !custom_song_id.is_empty() && custom_song_id != "0" {
-        parse_song_name(songs, &custom_song_id)
-            .unwrap_or_else(|| format!("Custom song {custom_song_id}"))
+    let song = if !custom_song_id.is_empty() && custom_song_id != "0" {
+        parse_song(songs, &custom_song_id).unwrap_or_else(|| SongInfo {
+            id: custom_song_id.clone(),
+            name: format!("Custom song {custom_song_id}"),
+            artist: String::new(),
+            size: String::new(),
+        })
     } else {
-        official_song_name(&official_song_id).to_owned()
+        SongInfo {
+            id: official_song_id.clone(),
+            name: official_song_name(&official_song_id).to_owned(),
+            artist: "RobTop".to_owned(),
+            size: String::new(),
+        }
     };
 
     Some(LevelInfo {
         name: value(&level_values, "2"),
         id: value(&level_values, "1"),
         creator,
+        creator_id,
         difficulty: difficulty_name(&level_values),
         rate_status: rate_status_name(&level_values),
         downloads: value(&level_values, "10"),
         likes: value(&level_values, "14"),
         length: length_name(&value(&level_values, "15")).to_owned(),
-        song_name,
+        stars: value(&level_values, "18"),
+        coins: value(&level_values, "37"),
+        verified_coins: enabled_name(&value(&level_values, "38")).to_owned(),
+        object_count: value(&level_values, "45"),
+        version: value(&level_values, "5"),
+        game_version: game_version_name(&value(&level_values, "13")).to_owned(),
+        password: password_name(&value(&level_values, "27")),
+        original_id: value(&level_values, "30"),
+        two_player: enabled_name(&value(&level_values, "31")).to_owned(),
+        song_id: song.id,
+        song_name: song.name,
+        song_artist: song.artist,
+        song_size: song.size,
         description: decode_base64(&value(&level_values, "3")),
         comments: Vec::new(),
         comments_error: None,
@@ -313,6 +352,8 @@ fn parse_created_levels_response(response: &str) -> Vec<CreatedLevel> {
                 downloads: value(&values, "10"),
                 likes: value(&values, "14"),
                 difficulty: difficulty_name(&values),
+                stars: value(&values, "18"),
+                length: length_name(&value(&values, "15")).to_owned(),
             })
         })
         .collect()
@@ -371,11 +412,24 @@ fn parse_tilde_pairs(input: &str) -> HashMap<String, String> {
     map
 }
 
-fn parse_song_name(songs: &str, song_id: &str) -> Option<String> {
+#[derive(Clone, Debug)]
+struct SongInfo {
+    id: String,
+    name: String,
+    artist: String,
+    size: String,
+}
+
+fn parse_song(songs: &str, song_id: &str) -> Option<SongInfo> {
     songs.split(":~:").find_map(|song| {
         let normalized = song.replace("~|~", ":");
         let values = parse_pairs(&normalized);
-        (value(&values, "1") == song_id).then(|| value(&values, "2"))
+        (value(&values, "1") == song_id).then(|| SongInfo {
+            id: value(&values, "1"),
+            name: value(&values, "2"),
+            artist: value(&values, "4"),
+            size: value(&values, "5"),
+        })
     })
 }
 
@@ -433,6 +487,61 @@ fn mod_status_name(mod_status: &str) -> &str {
         "2" => "Elder Moderator",
         "3" => "Leaderboard Moderator",
         _ => "None",
+    }
+}
+
+fn enabled_name(value: &str) -> &'static str {
+    match value {
+        "1" => "Yes",
+        "0" => "No",
+        _ => "N/A",
+    }
+}
+
+fn message_privacy_name(value: &str) -> &'static str {
+    match value {
+        "0" => "Open",
+        "1" => "Friends only",
+        "2" => "Closed",
+        _ => "N/A",
+    }
+}
+
+fn friend_privacy_name(value: &str) -> &'static str {
+    match value {
+        "0" => "Open",
+        "1" => "Closed",
+        _ => "N/A",
+    }
+}
+
+fn comment_history_privacy_name(value: &str) -> &'static str {
+    match value {
+        "0" => "Visible",
+        "1" => "Friends only",
+        "2" => "Hidden",
+        _ => "N/A",
+    }
+}
+
+fn game_version_name(value: &str) -> String {
+    if value.trim().is_empty() {
+        return String::new();
+    }
+
+    if value.len() >= 2 {
+        let (major, minor) = value.split_at(value.len() - 1);
+        format!("{major}.{minor}")
+    } else {
+        value.to_owned()
+    }
+}
+
+fn password_name(value: &str) -> String {
+    match value {
+        "" | "0" => "Not copyable".to_owned(),
+        "1" => "Free copy".to_owned(),
+        _ => value.to_owned(),
     }
 }
 
@@ -503,5 +612,47 @@ fn official_song_name(song_id: &str) -> &str {
         "21" => "Fingerdash",
         "22" => "Dash",
         _ => "N/A",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_rich_level_fields() {
+        let response = "1:123:2:Test Level:3:SGVsbG8=:5:7:6:42:9:50:10:1000:12:1:13:22:14:250:15:3:18:10:19:1:27:0:30:99:31:1:35:55:37:3:38:1:42:2:45:12345#42:Creator:9#1~|~55~|~2~|~Song Name~|~4~|~Artist~|~5~|~1.23MB";
+        let level = parse_level_response(response).expect("level parses");
+
+        assert_eq!(level.id, "123");
+        assert_eq!(level.creator, "Creator");
+        assert_eq!(level.difficulty, "Insane");
+        assert_eq!(level.rate_status, "Rated 10 stars, Featured, Legendary");
+        assert_eq!(level.length, "Long");
+        assert_eq!(level.description, "Hello");
+        assert_eq!(level.coins, "3");
+        assert_eq!(level.verified_coins, "Yes");
+        assert_eq!(level.object_count, "12345");
+        assert_eq!(level.original_id, "99");
+        assert_eq!(level.two_player, "Yes");
+        assert_eq!(level.song_name, "Song Name");
+        assert_eq!(level.song_artist, "Artist");
+    }
+
+    #[test]
+    fn parses_player_icons_and_privacy() {
+        let values = parse_pairs(
+            "1:User:2:88:16:99:21:1:22:2:23:3:24:4:25:5:26:6:43:7:53:8:10:12:11:13:28:1:18:1:19:0:50:2:44:xuser:45:tuser",
+        );
+        let player = player_from_values(&values);
+
+        assert_eq!(player.username, "User");
+        assert_eq!(player.cube_icon, "1");
+        assert_eq!(player.swing_icon, "8");
+        assert_eq!(player.primary_color, "12");
+        assert_eq!(player.glow, "Yes");
+        assert_eq!(player.message_privacy, "Friends only");
+        assert_eq!(player.friend_privacy, "Open");
+        assert_eq!(player.comment_history_privacy, "Hidden");
     }
 }

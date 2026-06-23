@@ -1,16 +1,20 @@
 # GD Info
 
-GD Info is a small native desktop utility for looking up Geometry Dash players and levels using the Boomlings API.
+GD Info is a small native desktop utility for inspecting Geometry Dash players and levels using the Boomlings API.
 
 ## Features
 
-- Player lookup by username
-- Level lookup by name or ID
-- Created levels shown on player profiles
-- Click a created level to load its details
-- Level comments with comment page navigation
-- Copy and clear results
-- Last 10 searches saved locally
+- Player lookup by username with stats, IDs, icon IDs, colors, privacy, and social fields
+- Level lookup by name or ID with rate data, coins, object count, version, copy state, original ID, and song metadata
+- Structured native inspector UI instead of terminal-style result text
+- Created levels shown on player profiles with paging, filtering, sorting, open, and copy-ID actions
+- Level comments with in-section page navigation that refreshes comments without reloading the whole level
+- Clickable cross-navigation for created levels, level creators, original levels, and commenter usernames
+- Favorites for players and levels
+- Recent search history with configurable limit
+- Settings for theme, history limit, result font size, request timeout, and local-data clearing
+- Local in-memory cache for repeated lookups during a session
+- Granular copy actions for full results, IDs, names, and account/user IDs
 
 ## Tech Stack
 
@@ -29,6 +33,12 @@ cargo run
 
 ```bash
 cargo build --release
+```
+
+## Verify
+
+```bash
+cargo fmt && cargo test && cargo check
 ```
 
 ## Releases
