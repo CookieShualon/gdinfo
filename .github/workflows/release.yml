@@ -107,6 +107,7 @@ jobs:
       - name: Create AppDir
         run: |
           mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
           cp target/release/gd_info AppDir/usr/bin/gd-info
           cat > AppDir/gd-info.desktop <<'DESKTOP'
           [Desktop Entry]
@@ -116,6 +117,7 @@ jobs:
           Icon=gd-info
           Categories=Utility;
           DESKTOP
+          cp AppDir/gd-info.desktop AppDir/usr/share/applications/gd-info.desktop
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           python3 - <<'PY'
           import struct, zlib
@@ -125,14 +127,20 @@ jobs:
           def chunk(kind, data):
               return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data) & 0xffffffff)
           png = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b'')
+          open('AppDir/gd-info.png', 'wb').write(png)
           open('AppDir/usr/share/icons/hicolor/256x256/apps/gd-info.png', 'wb').write(png)
           PY
+          cat > AppDir/AppRun <<'APPRUN'
+          #!/bin/sh
+          exec "$(dirname "$0")/usr/bin/gd-info" "$@"
+          APPRUN
+          chmod +x AppDir/AppRun
 
       - name: Build AppImage
         run: |
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage
-          ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --desktop-file AppDir/gd-info.desktop --icon-file AppDir/gd-info.png --output appimage
           mv ./*.AppImage GD-Info.AppImage
 
       - name: Upload artifact
