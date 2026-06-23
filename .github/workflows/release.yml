@@ -141,7 +141,7 @@ jobs:
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --desktop-file AppDir/gd-info.desktop --icon-file AppDir/gd-info.png --output appimage
-          mv ./*.AppImage GD-Info.AppImage
+          mv GD_Info-x86_64.AppImage GD-Info.AppImage
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
