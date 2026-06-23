@@ -82,6 +82,12 @@ The workflow builds on:
 - `windows-latest`, producing `gd-info.exe`
 - `ubuntu-latest`, producing `GD-Info.AppImage`
 
+The macOS app is ad-hoc signed in CI with `codesign --sign -`, but it is not Apple-notarized. Notarization requires Apple Developer ID credentials. If users see a macOS `damaged and can't be opened` warning, they can remove quarantine after installing:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/GD Info.app"
+```
+
 The final job uploads all three files to the GitHub Release for the tag.
 
 Use `gh run list` and `gh run view <run-id>` to inspect workflow runs.

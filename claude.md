@@ -45,6 +45,12 @@ Artifacts created by the workflow:
 - `gd-info.exe` from `windows-latest`
 - `GD-Info.AppImage` from `ubuntu-latest`
 
+The macOS app is ad-hoc signed in CI but not Apple-notarized. Full notarization requires Apple Developer ID credentials. If macOS reports the app is damaged, remove quarantine after installing:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/GD Info.app"
+```
+
 Check release runs with:
 
 ```bash

@@ -51,6 +51,18 @@ Release artifacts:
 - `gd-info.exe` for Windows
 - `GD-Info.AppImage` for Linux
 
+### macOS Gatekeeper
+
+The macOS app is ad-hoc signed in CI, but it is not Apple-notarized because notarization requires an Apple Developer ID certificate.
+
+If macOS says `"GD Info" is damaged and can't be opened`, remove the quarantine attribute after installing the app:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/GD Info.app"
+```
+
+Then open the app again.
+
 To inspect release workflow runs:
 
 ```bash

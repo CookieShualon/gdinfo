@@ -27,6 +27,7 @@ jobs:
           mkdir -p "GD Info.app/Contents/MacOS"
           mkdir -p "GD Info.app/Contents/Resources"
           cp target/release/gd_info "GD Info.app/Contents/MacOS/GD Info"
+          chmod +x "GD Info.app/Contents/MacOS/GD Info"
           cat > "GD Info.app/Contents/Info.plist" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -53,6 +54,9 @@ jobs:
           </dict>
           </plist>
           PLIST
+
+      - name: Ad-hoc sign app bundle
+        run: codesign --force --deep --sign - "GD Info.app"
 
       - name: Create DMG
         run: hdiutil create -volname "GD Info" -srcfolder "GD Info.app" -ov -format UDZO "GD-Info.dmg"
