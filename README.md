@@ -34,6 +34,30 @@ cargo run
 cargo build --release
 ```
 
+## Releases
+
+Cross-platform releases are built with GitHub Actions from `.github/workflows/release.yml`.
+
+The workflow runs when a version tag matching `v*` is pushed:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Release artifacts:
+
+- `GD-Info.dmg` for macOS
+- `gd-info.exe` for Windows
+- `GD-Info.AppImage` for Linux
+
+To inspect release workflow runs:
+
+```bash
+gh run list
+gh run view <run-id>
+```
+
 ## Notes
 
 This app uses the public Geometry Dash endpoints documented at <https://boomlings.dev/> for player, level, comment, and created-level data.

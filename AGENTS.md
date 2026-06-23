@@ -63,6 +63,29 @@ Before finishing code changes, run:
 cargo fmt && cargo check
 ```
 
+## Release Workflow
+
+GitHub Actions release automation lives at `.github/workflows/release.yml`.
+
+The workflow runs only when a version tag matching `v*` is pushed. A normal push to `master` will not run it.
+
+To create a release:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The workflow builds on:
+
+- `macos-latest`, producing `GD-Info.dmg`
+- `windows-latest`, producing `gd-info.exe`
+- `ubuntu-latest`, producing `GD-Info.AppImage`
+
+The final job uploads all three files to the GitHub Release for the tag.
+
+Use `gh run list` and `gh run view <run-id>` to inspect workflow runs.
+
 ## Git Ignore
 
 Generated files that should stay untracked:

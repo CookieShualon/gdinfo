@@ -25,3 +25,29 @@ Run this after edits:
 ```bash
 cargo fmt && cargo check
 ```
+
+## Releases
+
+Release automation is defined in `.github/workflows/release.yml`.
+
+It runs only for pushed tags matching `v*`, not for regular branch pushes.
+
+Create a release by tagging the current commit and pushing the tag:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Artifacts created by the workflow:
+
+- `GD-Info.dmg` from `macos-latest`
+- `gd-info.exe` from `windows-latest`
+- `GD-Info.AppImage` from `ubuntu-latest`
+
+Check release runs with:
+
+```bash
+gh run list
+gh run view <run-id>
+```
