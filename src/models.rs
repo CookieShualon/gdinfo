@@ -173,8 +173,15 @@ impl PlayerProfile {
         } else if !self.comment_history.is_empty() {
             text.push_str("\n\nComment History:\n");
             for comment in &self.comment_history {
+                let percent = if comment.percent.trim().is_empty() {
+                    String::new()
+                } else {
+                    format!(" [{}%]", comment.percent)
+                };
                 text.push_str(&format!(
-                    "{} likes - {}\n{}\n",
+                    "Level {}{} - {} likes - {}\n{}\n",
+                    display(&comment.level_id),
+                    percent,
                     display(&comment.likes),
                     display(&comment.age),
                     display(&comment.text),
@@ -189,8 +196,10 @@ impl PlayerProfile {
 #[derive(Clone, Debug, Default)]
 pub struct PlayerComment {
     pub text: String,
+    pub level_id: String,
     pub likes: String,
     pub age: String,
+    pub percent: String,
 }
 
 #[derive(Clone, Debug, Default)]

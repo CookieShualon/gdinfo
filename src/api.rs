@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use base64::{
     Engine as _,
-    engine::general_purpose::{STANDARD, URL_SAFE, URL_SAFE_NO_PAD},
+    engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD},
 };
 use reqwest::Client;
 
@@ -97,23 +97,25 @@ impl BoomlingsApi {
         })
     }
 
-    pub async fn account_comments(
+    pub async fn comment_history(
         &self,
-        account_id: &str,
+        user_id: &str,
         comment_page: u32,
     ) -> Result<Vec<PlayerComment>, ApiError> {
-        if account_id.trim().is_empty() {
+        if user_id.trim().is_empty() {
             return Ok(Vec::new());
         }
 
         let page = comment_page.to_string();
         let response = self
             .post(
-                "getGJAccountComments20.php",
+                "getGJCommentHistory.php",
                 &[
-                    ("accountID", account_id),
+                    ("userID", user_id),
                     ("page", &page),
+                    ("mode", "0"),
                     ("total", "0"),
+                    ("count", "10"),
                     ("secret", SECRET),
                 ],
             )
@@ -123,7 +125,7 @@ impl BoomlingsApi {
             return Ok(Vec::new());
         }
 
-        Ok(parse_account_comments_response(&response))
+        Ok(parse_comment_history_response(&response))
     }
 
     pub async fn search_level(
@@ -451,7 +453,7 @@ fn parse_comments_response(response: &str) -> Vec<LevelComment> {
         .collect()
 }
 
-fn parse_account_comments_response(response: &str) -> Vec<PlayerComment> {
+fn parse_comment_history_response(response: &str) -> Vec<PlayerComment> {
     response
         .split('#')
         .next()
@@ -463,11 +465,14 @@ fn parse_account_comments_response(response: &str) -> Vec<PlayerComment> {
                 return None;
             }
 
-            let values = parse_tilde_pairs(item);
+            let (comment_part, _) = item.split_once(':').unwrap_or((item, ""));
+            let values = parse_tilde_pairs(comment_part);
             Some(PlayerComment {
                 text: decode_base64(&value(&values, "2")),
+                level_id: value(&values, "6"),
                 likes: value(&values, "4"),
                 age: value(&values, "9"),
+                percent: value(&values, "10"),
             })
         })
         .collect()
@@ -545,8 +550,12 @@ fn value_or(values: &HashMap<String, String>, first: &str, second: &str) -> Stri
 }
 
 fn decode_base64(input: &str) -> String {
+    let input = input.trim();
     STANDARD
         .decode(input)
+        .or_else(|_| STANDARD_NO_PAD.decode(input))
+        .or_else(|_| URL_SAFE.decode(input))
+        .or_else(|_| URL_SAFE_NO_PAD.decode(input))
         .ok()
         .and_then(|bytes| String::from_utf8(bytes).ok())
         .unwrap_or_default()
@@ -816,14 +825,17 @@ mod tests {
     }
 
     #[test]
-    fn parses_account_comment_history() {
-        let response = "2~aSBiZWF0IHNvbmljIHdhdmU=~4~562182~9~5 years#1:0:10";
-        let comments = parse_account_comments_response(response);
+    fn parses_level_comment_history() {
+        let response =
+            "2~aSBiZWF0IHNvbmljIHdhdmU=~4~562182~6~1775040~9~5 years~10~43:1~User~10~18#1:0:10";
+        let comments = parse_comment_history_response(response);
 
         assert_eq!(comments.len(), 1);
         assert_eq!(comments[0].text, "i beat sonic wave");
+        assert_eq!(comments[0].level_id, "1775040");
         assert_eq!(comments[0].likes, "562182");
         assert_eq!(comments[0].age, "5 years");
+        assert_eq!(comments[0].percent, "43");
     }
 
     #[test]

@@ -44,7 +44,7 @@ Use the Boomlings API for all Geometry Dash data:
 - Players
 - Levels
 - Comments
-- Account comment history
+- Level comment history
 - Created levels
 - Stats
 - IDs
@@ -57,7 +57,7 @@ Do not use GDBrowser as a replacement for Boomlings data endpoints. GDBrowser is
 
 Level lookup primarily uses `getGJLevels21.php`. Use `downloadGJLevel22.php` narrowly for copy-state key `27`, because search responses can omit it. The key is encrypted with Geometry Dash's `26364` XOR scheme; decode it before labeling a level as free copy, not copyable, or password protected. Official song IDs from Boomlings are zero-based (`0` is Stereo Madness), and custom song records are separated with Boomlings song delimiters such as `~:~` and `~|~`.
 
-Player comment history uses `getGJAccountComments20.php` and should remain separate from level comments. Do not reload the full player profile when switching account-comment pages.
+Player comment history uses `getGJCommentHistory.php` with the player's user ID, not account ID. It returns the player's level-comment history and should remain separate from the current level's comments. Do not reload the full player profile when switching comment-history pages.
 
 ## Verification
 

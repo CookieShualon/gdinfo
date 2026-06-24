@@ -187,9 +187,9 @@ impl GdInfoApp {
             self.status = "Load a player before opening comment history.".to_owned();
             return;
         };
-        let account_id = profile.player.account_id.clone();
-        if account_id.trim().is_empty() {
-            self.status = "Current player has no account ID for comment history lookup.".to_owned();
+        let user_id = profile.player.user_id.clone();
+        if user_id.trim().is_empty() {
+            self.status = "Current player has no user ID for comment history lookup.".to_owned();
             return;
         }
 
@@ -214,7 +214,7 @@ impl GdInfoApp {
 
         runtime.spawn(async move {
             let result = api
-                .account_comments(&account_id, page)
+                .comment_history(&user_id, page)
                 .await
                 .map_err(|error| error.to_string());
 
@@ -787,7 +787,20 @@ impl GdInfoApp {
             for comment in &profile.comment_history {
                 ui.group(|ui| {
                     ui.horizontal(|ui| {
+                        if !comment.level_id.trim().is_empty()
+                            && ui
+                                .button(format!("Level {}", display(&comment.level_id)))
+                                .clicked()
+                        {
+                            self.query = comment.level_id.clone();
+                            self.search_type = SearchType::Level;
+                            self.comment_page = 0;
+                            self.start_search(ctx);
+                        }
                         ui.label(format!("{} likes", display(&comment.likes)));
+                        if !comment.percent.trim().is_empty() {
+                            ui.label(format!("{}%", comment.percent));
+                        }
                         ui.label(display(&comment.age));
                     });
                     ui.label(&comment.text);

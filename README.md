@@ -45,7 +45,7 @@ Exact limits change over time, but as of November 3, 2023, the rough limits were
 - `downloadGJLevel`: about 20 requests per minute
 - Other data-retrieval endpoints: about 2 requests per second
 
-GD Info uses `downloadGJLevel22.php` only to read copy-state metadata and decode protected copy passwords. Player, level search, created-level, account-comment, level-comment, and song metadata still come from Boomlings data-retrieval endpoints.
+GD Info uses `downloadGJLevel22.php` only to read copy-state metadata and decode protected copy passwords. Player, level search, created-level, level-comment history, level-comment, and song metadata still come from Boomlings data-retrieval endpoints.
 
 Longer-term limits can also apply on top of the short-term limits.
 
@@ -93,4 +93,4 @@ gh run view <run-id>
 
 ## Notes
 
-This app uses the public Geometry Dash endpoints documented at <https://boomlings.dev/> for player, level, account-comment, level-comment, created-level, copy-state, and song metadata.
+This app uses the public Geometry Dash endpoints documented at <https://boomlings.dev/> for player, level, level-comment history, level-comment, created-level, copy-state, and song metadata.
