@@ -9,8 +9,8 @@ use tokio::runtime::Runtime;
 use crate::{
     api::BoomlingsApi,
     models::{
-        AppData, CreatedLevel, LevelComment, LevelInfo, PlayerInfo, PlayerProfile, SearchEntry,
-        SearchResult, SearchType, ThemeMode, display,
+        AppData, CreatedLevel, LevelComment, LevelInfo, PlayerComment, PlayerInfo, PlayerProfile,
+        SearchEntry, SearchResult, SearchType, ThemeMode, display,
     },
     storage,
 };
@@ -25,6 +25,11 @@ struct SearchOutput {
 struct CommentsOutput {
     request_id: u64,
     result: Result<Vec<LevelComment>, String>,
+}
+
+struct PlayerCommentsOutput {
+    request_id: u64,
+    result: Result<Vec<PlayerComment>, String>,
 }
 
 pub struct GdInfoApp {
@@ -42,12 +47,17 @@ pub struct GdInfoApp {
     api: Option<BoomlingsApi>,
     pending: Option<Receiver<SearchOutput>>,
     pending_comments: Option<Receiver<CommentsOutput>>,
+    pending_player_comments: Option<Receiver<PlayerCommentsOutput>>,
     searching: bool,
     comments_loading: bool,
+    player_comments_loading: bool,
     request_id: u64,
     comments_request_id: u64,
+    player_comments_request_id: u64,
     cache: HashMap<SearchEntry, SearchResult>,
     show_settings: bool,
+    show_player_comment_history: bool,
+    player_comment_history_page: u32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -109,12 +119,17 @@ impl GdInfoApp {
             api,
             pending: None,
             pending_comments: None,
+            pending_player_comments: None,
             searching: false,
             comments_loading: false,
+            player_comments_loading: false,
             request_id: 0,
             comments_request_id: 0,
+            player_comments_request_id: 0,
             cache: HashMap::new(),
             show_settings: false,
+            show_player_comment_history: false,
+            player_comment_history_page: 0,
         }
     }
 
@@ -163,6 +178,47 @@ impl GdInfoApp {
                 .map_err(|error| error.to_string());
 
             let _ = sender.send(CommentsOutput { request_id, result });
+            repaint_ctx.request_repaint();
+        });
+    }
+
+    fn start_player_comment_history_search(&mut self, ctx: &egui::Context) {
+        let Some(SearchResult::Player(profile)) = &self.result else {
+            self.status = "Load a player before opening comment history.".to_owned();
+            return;
+        };
+        let account_id = profile.player.account_id.clone();
+        if account_id.trim().is_empty() {
+            self.status = "Current player has no account ID for comment history lookup.".to_owned();
+            return;
+        }
+
+        let Some(runtime) = &self.runtime else {
+            self.status = "Comment history unavailable: async runtime failed to start.".to_owned();
+            return;
+        };
+        let Some(api) = self.api.clone() else {
+            self.status = "Comment history unavailable: HTTP client failed to start.".to_owned();
+            return;
+        };
+
+        self.player_comments_request_id += 1;
+        let request_id = self.player_comments_request_id;
+        let page = self.player_comment_history_page;
+        let (sender, receiver) = mpsc::channel();
+        let repaint_ctx = ctx.clone();
+
+        self.pending_player_comments = Some(receiver);
+        self.player_comments_loading = true;
+        self.status = format!("Loading comment history page {page}...");
+
+        runtime.spawn(async move {
+            let result = api
+                .account_comments(&account_id, page)
+                .await
+                .map_err(|error| error.to_string());
+
+            let _ = sender.send(PlayerCommentsOutput { request_id, result });
             repaint_ctx.request_repaint();
         });
     }
@@ -300,12 +356,44 @@ impl GdInfoApp {
         }
     }
 
+    fn receive_pending_player_comments(&mut self) {
+        if let Some(receiver) = &self.pending_player_comments {
+            if let Ok(output) = receiver.try_recv() {
+                if output.request_id == self.player_comments_request_id {
+                    if let Some(SearchResult::Player(profile)) = &mut self.result {
+                        match output.result {
+                            Ok(comments) => {
+                                profile.comment_history = comments;
+                                profile.comment_history_error = None;
+                                self.status = format!(
+                                    "Loaded comment history page {}.",
+                                    self.player_comment_history_page
+                                );
+                            }
+                            Err(error) => {
+                                profile.comment_history.clear();
+                                profile.comment_history_error = Some(error.clone());
+                                self.status = format!("Error: {error}");
+                            }
+                        }
+                    }
+                    self.player_comments_loading = false;
+                    self.pending_player_comments = None;
+                }
+            }
+        }
+    }
+
     fn apply_result(&mut self, result: SearchResult) {
         if let SearchResult::Player(profile) = &result {
             self.created_levels = profile.created_levels.clone();
         } else {
             self.created_levels.clear();
         }
+        self.show_player_comment_history = false;
+        self.player_comment_history_page = 0;
+        self.player_comments_loading = false;
+        self.pending_player_comments = None;
         self.result = Some(result);
     }
 
@@ -342,6 +430,7 @@ impl eframe::App for GdInfoApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.receive_pending();
         self.receive_pending_comments();
+        self.receive_pending_player_comments();
 
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
             ui.horizontal(|ui| {
@@ -597,14 +686,114 @@ impl GdInfoApp {
                 &[
                     ("Messages", &profile.player.message_privacy),
                     ("Friend requests", &profile.player.friend_privacy),
-                    ("Comment history", &profile.player.comment_history_privacy),
                     ("YouTube", &profile.player.youtube),
                     ("Twitter/X", &profile.player.twitter),
                     ("Twitch", &profile.player.twitch),
                 ],
-            )
+            );
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Comment history").color(ui.visuals().weak_text_color()));
+                ui.label(
+                    RichText::new(display(&profile.player.comment_history_privacy)).monospace(),
+                );
+                if profile.player.comment_history_privacy == "Visible" {
+                    let label = if self.show_player_comment_history {
+                        "Hide"
+                    } else {
+                        "Show"
+                    };
+                    if ui
+                        .add_enabled(!self.player_comments_loading, egui::Button::new(label))
+                        .clicked()
+                    {
+                        if self.show_player_comment_history {
+                            self.show_player_comment_history = false;
+                        } else {
+                            self.show_player_comment_history = true;
+                            self.player_comment_history_page = 0;
+                            self.start_player_comment_history_search(ctx);
+                        }
+                    }
+                }
+            });
         });
+        if self.show_player_comment_history {
+            self.render_player_comment_history(ui, ctx, profile);
+        }
         self.render_created_levels(ui, ctx);
+    }
+
+    fn render_player_comment_history(
+        &mut self,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        profile: &PlayerProfile,
+    ) {
+        section(ui, "Comment history", |ui| {
+            ui.horizontal(|ui| {
+                ui.label(format!("Page {}", self.player_comment_history_page));
+                if ui
+                    .add_enabled(
+                        !self.searching
+                            && !self.player_comments_loading
+                            && self.player_comment_history_page > 0,
+                        egui::Button::new("Prev"),
+                    )
+                    .clicked()
+                {
+                    self.player_comment_history_page -= 1;
+                    self.start_player_comment_history_search(ctx);
+                }
+                ui.add(
+                    egui::DragValue::new(&mut self.player_comment_history_page)
+                        .speed(1)
+                        .range(0..=999),
+                );
+                if ui
+                    .add_enabled(
+                        !self.searching && !self.player_comments_loading,
+                        egui::Button::new("Load page"),
+                    )
+                    .clicked()
+                {
+                    self.start_player_comment_history_search(ctx);
+                }
+                if ui
+                    .add_enabled(
+                        !self.searching && !self.player_comments_loading,
+                        egui::Button::new("Next"),
+                    )
+                    .clicked()
+                {
+                    self.player_comment_history_page += 1;
+                    self.start_player_comment_history_search(ctx);
+                }
+                if self.player_comments_loading {
+                    ui.label(
+                        RichText::new("Loading comment history...")
+                            .color(ui.visuals().weak_text_color()),
+                    );
+                }
+            });
+
+            if let Some(error) = &profile.comment_history_error {
+                ui.label(format!("Could not load comment history: {error}"));
+                return;
+            }
+            if profile.comment_history.is_empty() {
+                ui.label("No comment history found.");
+                return;
+            }
+            for comment in &profile.comment_history {
+                ui.group(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(format!("{} likes", display(&comment.likes)));
+                        ui.label(display(&comment.age));
+                    });
+                    ui.label(&comment.text);
+                });
+            }
+        });
     }
 
     fn render_level(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, level: &LevelInfo) {

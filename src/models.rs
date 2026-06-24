@@ -143,6 +143,8 @@ impl PlayerInfo {
 pub struct PlayerProfile {
     pub player: PlayerInfo,
     pub created_levels: Vec<CreatedLevel>,
+    pub comment_history: Vec<PlayerComment>,
+    pub comment_history_error: Option<String>,
 }
 
 impl PlayerProfile {
@@ -166,8 +168,29 @@ impl PlayerProfile {
             }
         }
 
+        if let Some(error) = &self.comment_history_error {
+            text.push_str(&format!("\n\nCould not load comment history: {error}"));
+        } else if !self.comment_history.is_empty() {
+            text.push_str("\n\nComment History:\n");
+            for comment in &self.comment_history {
+                text.push_str(&format!(
+                    "{} likes - {}\n{}\n",
+                    display(&comment.likes),
+                    display(&comment.age),
+                    display(&comment.text),
+                ));
+            }
+        }
+
         text.trim_end().to_owned()
     }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct PlayerComment {
+    pub text: String,
+    pub likes: String,
+    pub age: String,
 }
 
 #[derive(Clone, Debug, Default)]

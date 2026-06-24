@@ -9,11 +9,13 @@ GD Info is a small native Rust desktop inspector using egui/eframe.
 - Keep the UI compact, structured, and utility-like.
 - Do not regress the primary results UI to terminal-style text blobs.
 - Keep comment page controls inside the Comments section; changing comment pages should refresh only comments, not the whole level result.
+- Keep player comment-history controls next to Comment history; changing account-comment pages should refresh only comment history, not the whole player profile.
 - Avoid adding dependencies unless clearly needed.
 
 ## Current Product Surface
 
 - Player lookup includes stats, IDs, icon IDs, colors, privacy, and social fields.
+- Visible player comment history can be opened and hidden from the Comment history row and includes isolated page navigation.
 - Level lookup includes rate data, coins, object count, version, copy state, decoded copy password when protected, original ID, two-player state, and song metadata.
 - Player profiles include created levels with paging, filtering, sorting, open, and copy-ID actions.
 - Level views include comments with isolated comment pagination.
@@ -34,6 +36,7 @@ GD Info is a small native Rust desktop inspector using egui/eframe.
 - Copy-state key `27` is encrypted with Geometry Dash's `26364` XOR scheme; decode it before labeling levels or showing protected copy passwords.
 - Official Boomlings song IDs are zero-based: `0` is Stereo Madness.
 - Custom song records use Boomlings song delimiters such as `~:~` and `~|~`.
+- Player comment history uses `getGJAccountComments20.php`; keep it separate from level comments and avoid full profile reloads when switching pages.
 
 ## Test Command
 

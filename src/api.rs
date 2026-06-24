@@ -6,7 +6,9 @@ use base64::{
 };
 use reqwest::Client;
 
-use crate::models::{CreatedLevel, LevelComment, LevelInfo, PlayerInfo, PlayerProfile};
+use crate::models::{
+    CreatedLevel, LevelComment, LevelInfo, PlayerComment, PlayerInfo, PlayerProfile,
+};
 
 const BASE_URL: &str = "https://www.boomlings.com/database";
 const SECRET: &str = "Wmfd2893gb7";
@@ -57,6 +59,8 @@ impl BoomlingsApi {
             return Ok(PlayerProfile {
                 player,
                 created_levels,
+                comment_history: Vec::new(),
+                comment_history_error: None,
             });
         }
 
@@ -75,6 +79,8 @@ impl BoomlingsApi {
             return Ok(PlayerProfile {
                 player,
                 created_levels,
+                comment_history: Vec::new(),
+                comment_history_error: None,
             });
         }
 
@@ -86,7 +92,38 @@ impl BoomlingsApi {
         Ok(PlayerProfile {
             player,
             created_levels,
+            comment_history: Vec::new(),
+            comment_history_error: None,
         })
+    }
+
+    pub async fn account_comments(
+        &self,
+        account_id: &str,
+        comment_page: u32,
+    ) -> Result<Vec<PlayerComment>, ApiError> {
+        if account_id.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let page = comment_page.to_string();
+        let response = self
+            .post(
+                "getGJAccountComments20.php",
+                &[
+                    ("accountID", account_id),
+                    ("page", &page),
+                    ("total", "0"),
+                    ("secret", SECRET),
+                ],
+            )
+            .await?;
+
+        if response == "-1" || response.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+
+        Ok(parse_account_comments_response(&response))
     }
 
     pub async fn search_level(
@@ -409,6 +446,28 @@ fn parse_comments_response(response: &str) -> Vec<LevelComment> {
                 likes: value(&comment_values, "4"),
                 age: value(&comment_values, "9"),
                 percent: value(&comment_values, "10"),
+            })
+        })
+        .collect()
+}
+
+fn parse_account_comments_response(response: &str) -> Vec<PlayerComment> {
+    response
+        .split('#')
+        .next()
+        .unwrap_or_default()
+        .split('|')
+        .take(10)
+        .filter_map(|item| {
+            if item.trim().is_empty() {
+                return None;
+            }
+
+            let values = parse_tilde_pairs(item);
+            Some(PlayerComment {
+                text: decode_base64(&value(&values, "2")),
+                likes: value(&values, "4"),
+                age: value(&values, "9"),
             })
         })
         .collect()
@@ -754,6 +813,17 @@ mod tests {
         let copy_info = parse_level_copy_info(response).expect("copy info parses");
         assert_eq!(copy_info.state, "Password protected");
         assert_eq!(copy_info.password, "004887");
+    }
+
+    #[test]
+    fn parses_account_comment_history() {
+        let response = "2~aSBiZWF0IHNvbmljIHdhdmU=~4~562182~9~5 years#1:0:10";
+        let comments = parse_account_comments_response(response);
+
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].text, "i beat sonic wave");
+        assert_eq!(comments[0].likes, "562182");
+        assert_eq!(comments[0].age, "5 years");
     }
 
     #[test]
