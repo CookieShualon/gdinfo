@@ -1,6 +1,9 @@
 use std::{collections::HashMap, time::Duration};
 
-use base64::{Engine as _, engine::general_purpose::STANDARD};
+use base64::{
+    Engine as _,
+    engine::general_purpose::{STANDARD, URL_SAFE, URL_SAFE_NO_PAD},
+};
 use reqwest::Client;
 
 use crate::models::{CreatedLevel, LevelComment, LevelInfo, PlayerInfo, PlayerProfile};
@@ -120,6 +123,11 @@ impl BoomlingsApi {
         let mut level = parse_level_response(&response)
             .ok_or_else(|| ApiError::Parse("Could not read level data.".to_owned()))?;
 
+        if let Ok(Some(copy_info)) = self.level_copy_info(&level.id).await {
+            level.password = copy_info.state;
+            level.copy_password = copy_info.password;
+        }
+
         match self.level_comments(&level.id, comment_page).await {
             Ok(comments) => level.comments = comments,
             Err(error) => level.comments_error = Some(error.to_string()),
@@ -186,6 +194,25 @@ impl BoomlingsApi {
         }
 
         Ok(parse_comments_response(&response))
+    }
+
+    async fn level_copy_info(&self, level_id: &str) -> Result<Option<CopyInfo>, ApiError> {
+        if level_id.trim().is_empty() {
+            return Ok(None);
+        }
+
+        let response = self
+            .post(
+                "downloadGJLevel22.php",
+                &[("levelID", level_id), ("secret", SECRET)],
+            )
+            .await?;
+
+        if response == "-1" || response.trim().is_empty() {
+            return Ok(None);
+        }
+
+        Ok(parse_level_copy_info(&response))
     }
 
     async fn post(&self, endpoint: &str, fields: &[(&str, &str)]) -> Result<String, ApiError> {
@@ -320,7 +347,8 @@ fn parse_level_response(response: &str) -> Option<LevelInfo> {
         object_count: value(&level_values, "45"),
         version: value(&level_values, "5"),
         game_version: game_version_name(&value(&level_values, "13")).to_owned(),
-        password: password_name(&value(&level_values, "27")),
+        password: copy_info(&value(&level_values, "27")).state,
+        copy_password: copy_info(&value(&level_values, "27")).password,
         original_id: value(&level_values, "30"),
         two_player: enabled_name(&value(&level_values, "31")).to_owned(),
         song_id: song.id,
@@ -420,17 +448,28 @@ struct SongInfo {
     size: String,
 }
 
+#[derive(Clone, Debug)]
+struct CopyInfo {
+    state: String,
+    password: String,
+}
+
 fn parse_song(songs: &str, song_id: &str) -> Option<SongInfo> {
-    songs.split(":~:").find_map(|song| {
+    songs.split("~:~").find_map(|song| {
         let normalized = song.replace("~|~", ":");
         let values = parse_pairs(&normalized);
         (value(&values, "1") == song_id).then(|| SongInfo {
             id: value(&values, "1"),
             name: value(&values, "2"),
             artist: value(&values, "4"),
-            size: value(&values, "5"),
+            size: song_size_name(&value(&values, "5")),
         })
     })
+}
+
+fn parse_level_copy_info(response: &str) -> Option<CopyInfo> {
+    let values = parse_pairs(response.split('#').next()?);
+    Some(copy_info(&value(&values, "27")))
 }
 
 fn value(values: &HashMap<String, String>, key: &str) -> String {
@@ -537,11 +576,64 @@ fn game_version_name(value: &str) -> String {
     }
 }
 
-fn password_name(value: &str) -> String {
-    match value {
-        "" | "0" => "Not copyable".to_owned(),
-        "1" => "Free copy".to_owned(),
-        _ => value.to_owned(),
+fn copy_info(value: &str) -> CopyInfo {
+    match value.trim() {
+        "" | "0" => CopyInfo {
+            state: "Not copyable".to_owned(),
+            password: String::new(),
+        },
+        "1" => CopyInfo {
+            state: "Free copy".to_owned(),
+            password: String::new(),
+        },
+        value => match decode_level_password(value).as_deref() {
+            Some("0") => CopyInfo {
+                state: "Not copyable".to_owned(),
+                password: String::new(),
+            },
+            Some("1") => CopyInfo {
+                state: "Free copy".to_owned(),
+                password: String::new(),
+            },
+            Some(decoded) => CopyInfo {
+                state: "Password protected".to_owned(),
+                password: decoded.strip_prefix('1').unwrap_or(decoded).to_owned(),
+            },
+            None => CopyInfo {
+                state: "Password protected".to_owned(),
+                password: String::new(),
+            },
+        },
+    }
+}
+
+fn decode_level_password(value: &str) -> Option<String> {
+    let bytes = URL_SAFE
+        .decode(value)
+        .or_else(|_| URL_SAFE_NO_PAD.decode(value))
+        .or_else(|_| STANDARD.decode(value))
+        .ok()?;
+    let key = b"26364";
+    let decoded = bytes
+        .iter()
+        .enumerate()
+        .map(|(index, byte)| byte ^ key[index % key.len()])
+        .collect::<Vec<_>>();
+    let decoded = String::from_utf8(decoded).ok()?;
+
+    decoded
+        .chars()
+        .all(|ch| ch.is_ascii_digit())
+        .then_some(decoded)
+}
+
+fn song_size_name(value: &str) -> String {
+    if value.trim().is_empty() {
+        String::new()
+    } else if value.ends_with("MB") {
+        value.to_owned()
+    } else {
+        format!("{value} MB")
     }
 }
 
@@ -589,28 +681,28 @@ fn length_name(length: &str) -> &str {
 
 fn official_song_name(song_id: &str) -> &str {
     match song_id {
-        "1" => "Stereo Madness",
-        "2" => "Back On Track",
-        "3" => "Polargeist",
-        "4" => "Dry Out",
-        "5" => "Base After Base",
-        "6" => "Cant Let Go",
-        "7" => "Jumper",
-        "8" => "Time Machine",
-        "9" => "Cycles",
-        "10" => "xStep",
-        "11" => "Clutterfunk",
-        "12" => "Theory of Everything",
-        "13" => "Electroman Adventures",
-        "14" => "Clubstep",
-        "15" => "Electrodynamix",
-        "16" => "Hexagon Force",
-        "17" => "Blast Processing",
-        "18" => "Theory of Everything 2",
-        "19" => "Geometrical Dominator",
-        "20" => "Deadlocked",
-        "21" => "Fingerdash",
-        "22" => "Dash",
+        "0" => "Stereo Madness",
+        "1" => "Back On Track",
+        "2" => "Polargeist",
+        "3" => "Dry Out",
+        "4" => "Base After Base",
+        "5" => "Cant Let Go",
+        "6" => "Jumper",
+        "7" => "Time Machine",
+        "8" => "Cycles",
+        "9" => "xStep",
+        "10" => "Clutterfunk",
+        "11" => "Theory of Everything",
+        "12" => "Electroman Adventures",
+        "13" => "Clubstep",
+        "14" => "Electrodynamix",
+        "15" => "Hexagon Force",
+        "16" => "Blast Processing",
+        "17" => "Theory of Everything 2",
+        "18" => "Geometrical Dominator",
+        "19" => "Deadlocked",
+        "20" => "Fingerdash",
+        "21" => "Dash",
         _ => "N/A",
     }
 }
@@ -637,6 +729,31 @@ mod tests {
         assert_eq!(level.two_player, "Yes");
         assert_eq!(level.song_name, "Song Name");
         assert_eq!(level.song_artist, "Artist");
+        assert_eq!(level.song_size, "1.23MB");
+        assert_eq!(level.password, "Not copyable");
+        assert_eq!(level.copy_password, "");
+    }
+
+    #[test]
+    fn maps_official_song_ids_from_zero() {
+        let response = "1:1:2:Official Song Level:6:42:12:0:15:0#42:Creator:9#";
+        let level = parse_level_response(response).expect("level parses");
+
+        assert_eq!(level.song_id, "0");
+        assert_eq!(level.song_name, "Stereo Madness");
+    }
+
+    #[test]
+    fn parses_copy_state_from_download_metadata() {
+        let response = "1:1:2:Copyable Level:27:Aw==#hash#hash";
+        let copy_info = parse_level_copy_info(response).expect("copy info parses");
+        assert_eq!(copy_info.state, "Free copy");
+        assert_eq!(copy_info.password, "");
+
+        let response = "1:1:2:Protected Level:27:AwYDAgwKAQ==#hash#hash";
+        let copy_info = parse_level_copy_info(response).expect("copy info parses");
+        assert_eq!(copy_info.state, "Password protected");
+        assert_eq!(copy_info.password, "004887");
     }
 
     #[test]

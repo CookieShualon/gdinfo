@@ -5,7 +5,7 @@ GD Info is a small native desktop utility for inspecting Geometry Dash players a
 ## Features
 
 - Player lookup by username with stats, IDs, icon IDs, colors, privacy, and social fields
-- Level lookup by name or ID with rate data, coins, object count, version, copy state, original ID, and song metadata
+- Level lookup by name or ID with rate data, coins, object count, version, copy state, decoded copy password when protected, original ID, and song metadata
 - Structured native inspector UI instead of terminal-style result text
 - Created levels shown on player profiles with paging, filtering, sorting, open, and copy-ID actions
 - Level comments with in-section page navigation that refreshes comments without reloading the whole level
@@ -44,7 +44,7 @@ Exact limits change over time, but as of November 3, 2023, the rough limits were
 - `downloadGJLevel`: about 20 requests per minute
 - Other data-retrieval endpoints: about 2 requests per second
 
-GD Info does not currently call `downloadGJLevel`; it only uses data-retrieval endpoints for players, levels, created levels, and comments.
+GD Info uses `downloadGJLevel22.php` only to read copy-state metadata and decode protected copy passwords. Player, level search, created-level, comment, and song metadata still come from Boomlings data-retrieval endpoints.
 
 Longer-term limits can also apply on top of the short-term limits.
 
@@ -92,4 +92,4 @@ gh run view <run-id>
 
 ## Notes
 
-This app uses the public Geometry Dash endpoints documented at <https://boomlings.dev/> for player, level, comment, and created-level data.
+This app uses the public Geometry Dash endpoints documented at <https://boomlings.dev/> for player, level, comment, created-level, copy-state, and song metadata.

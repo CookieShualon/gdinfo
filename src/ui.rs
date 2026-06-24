@@ -655,6 +655,7 @@ impl GdInfoApp {
                     ("Version", &level.version),
                     ("Game version", &level.game_version),
                     ("Copy state", &level.password),
+                    ("Copy password", &level.copy_password),
                     ("Original ID", &level.original_id),
                     ("Two player", &level.two_player),
                     ("Song ID", &level.song_id),

@@ -29,7 +29,7 @@ Important source files:
 ## Current Product Surface
 
 - Player lookup by username with stats, IDs, icon IDs, colors, privacy, and social fields.
-- Level lookup by name or ID with rate data, coins, object count, version, copy state, original ID, two-player state, and song metadata.
+- Level lookup by name or ID with rate data, coins, object count, version, copy state, decoded copy password when protected, original ID, two-player state, and song metadata.
 - Structured egui inspector panels; do not regress to terminal-style result blobs as the primary UI.
 - Created levels live inside player profiles and support paging, filtering, sorting, open, and copy-ID actions.
 - Level comments live inside the level view. Comment page controls belong in the Comments section and should refresh only comments, not the whole level result.
@@ -48,8 +48,12 @@ Use the Boomlings API for all Geometry Dash data:
 - IDs
 - Colors
 - Icon IDs
+- Copy-state and copy-password metadata
+- Song metadata
 
 Do not use GDBrowser as a replacement for Boomlings data endpoints. GDBrowser is slower and not intended to replace direct Boomlings API access.
+
+Level lookup primarily uses `getGJLevels21.php`. Use `downloadGJLevel22.php` narrowly for copy-state key `27`, because search responses can omit it. The key is encrypted with Geometry Dash's `26364` XOR scheme; decode it before labeling a level as free copy, not copyable, or password protected. Official song IDs from Boomlings are zero-based (`0` is Stereo Madness), and custom song records are separated with Boomlings song delimiters such as `~:~` and `~|~`.
 
 ## Verification
 

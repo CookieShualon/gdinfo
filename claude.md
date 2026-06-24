@@ -14,7 +14,7 @@ GD Info is a small native Rust desktop inspector using egui/eframe.
 ## Current Product Surface
 
 - Player lookup includes stats, IDs, icon IDs, colors, privacy, and social fields.
-- Level lookup includes rate data, coins, object count, version, copy state, original ID, two-player state, and song metadata.
+- Level lookup includes rate data, coins, object count, version, copy state, decoded copy password when protected, original ID, two-player state, and song metadata.
 - Player profiles include created levels with paging, filtering, sorting, open, and copy-ID actions.
 - Level views include comments with isolated comment pagination.
 - App-local features include favorites, recent searches, settings, and in-memory lookup cache.
@@ -26,6 +26,14 @@ GD Info is a small native Rust desktop inspector using egui/eframe.
 - `src/ui.rs`: Single-window egui interface.
 - `src/models.rs`: Shared structs.
 - `src/storage.rs`: Local app data persistence for history, favorites, and settings.
+
+## Boomlings Parsing Notes
+
+- Level lookup primarily uses `getGJLevels21.php`.
+- Use `downloadGJLevel22.php` only to read copy-state key `27`, because search responses can omit it.
+- Copy-state key `27` is encrypted with Geometry Dash's `26364` XOR scheme; decode it before labeling levels or showing protected copy passwords.
+- Official Boomlings song IDs are zero-based: `0` is Stereo Madness.
+- Custom song records use Boomlings song delimiters such as `~:~` and `~|~`.
 
 ## Test Command
 

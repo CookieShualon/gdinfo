@@ -199,6 +199,7 @@ pub struct LevelInfo {
     pub version: String,
     pub game_version: String,
     pub password: String,
+    pub copy_password: String,
     pub original_id: String,
     pub two_player: String,
     pub song_id: String,
@@ -228,7 +229,8 @@ impl LevelInfo {
         push_field(&mut lines, "Object Count", &self.object_count);
         push_field(&mut lines, "Version", &self.version);
         push_field(&mut lines, "Game Version", &self.game_version);
-        push_field(&mut lines, "Password", &self.password);
+        push_field(&mut lines, "Copy State", &self.password);
+        push_field(&mut lines, "Copy Password", &self.copy_password);
         push_field(&mut lines, "Original ID", &self.original_id);
         push_field(&mut lines, "Two Player", &self.two_player);
         push_field(&mut lines, "Song ID", &self.song_id);
