@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     sync::mpsc::{self, Receiver},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use eframe::egui::{self, Color32, RichText, TextEdit};
@@ -58,6 +59,7 @@ pub struct GdInfoApp {
     show_settings: bool,
     show_player_comment_history: bool,
     player_comment_history_page: u32,
+    splash_text: &'static str,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -130,6 +132,7 @@ impl GdInfoApp {
             show_settings: false,
             show_player_comment_history: false,
             player_comment_history_page: 0,
+            splash_text: random_splash_text(),
         }
     }
 
@@ -647,7 +650,7 @@ impl GdInfoApp {
         ui.vertical_centered(|ui| {
             ui.add_space(70.0);
             ui.heading("Search a player or level");
-            ui.label("Results now appear as native sections instead of terminal text.");
+            ui.label(RichText::new(self.splash_text).color(ui.visuals().weak_text_color()));
         });
     }
 
@@ -1084,6 +1087,29 @@ fn copy_button(ui: &mut egui::Ui, ctx: &egui::Context, label: &str, value: Strin
     if ui.small_button(label).clicked() {
         ctx.copy_text(value);
     }
+}
+
+fn random_splash_text() -> &'static str {
+    const SPLASH_TEXTS: &[&str] = &[
+        "Checking the servers, one demon at a time.",
+        "Now with fewer blind jumps.",
+        "RobTop probably knows.",
+        "That username has lore.",
+        "Fetching stats without opening a browser.",
+        "Dash, but make it searchable.",
+        "The comments are usually the real level.",
+        "Still waiting for 2.3.",
+        "Your next lookup could be Mythic.",
+        "No practice mode required.",
+        "Counting stars so you do not have to.",
+        "Boomlings inspector, ship-ready.",
+    ];
+
+    let seed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos() as usize)
+        .unwrap_or(0);
+    SPLASH_TEXTS[seed % SPLASH_TEXTS.len()]
 }
 
 fn apply_theme(ctx: &egui::Context, theme: ThemeMode) {
